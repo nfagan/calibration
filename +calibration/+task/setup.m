@@ -9,14 +9,17 @@ calibration_manager = make_calibration_manager( calibration_rect );
 start( calibration_manager );
 
 reward_info = extend_reward_info( reward_info );
+reward_manager_type = get_reward_manager_type( reward_info );
+serial_port = maybe_get_arduino_reward_serial_port( reward_manager_type, reward_info );
 
 main_window = make_window( display_opts );
 states = make_states( program );
 task = make_task( program );
 stimuli = make_images( main_window, stim_info );
-ni_session = make_ni_daq_session();
-ni_scan_output = make_ni_scan_output( ni_session );
-reward_manager = make_ni_reward_manager( ni_scan_output, reward_info.channel_index );
+
+[ni_session, ni_scan_output] = maybe_make_ni_session_components( reward_manager_type );
+reward_manager = ...
+  make_reward_manager( reward_manager_type, ni_scan_output, serial_port, reward_info.channel_index );
 
 program.Value.calibration_manager = calibration_manager;
 program.Value.main_window = main_window;
@@ -111,6 +114,70 @@ obj = calibration.EyelinkCalibration( calibration_rect );
 
 end
 
+function [ni_session, ni_scan_output] = maybe_make_ni_session_components(reward_manager_type)
+
+ni_session = [];
+ni_scan_output = [];
+
+switch ( reward_manager_type )
+  case 'arduino'
+    %
+  case 'ni'
+    ni_session = make_ni_daq_session();
+    ni_scan_output = make_ni_scan_output( ni_session );
+    
+  otherwise
+    error( 'Unhandled reward manager type "%s".', reward_manager_type );
+end
+
+end
+
+function serial_port = maybe_get_arduino_reward_serial_port(reward_manager_type, reward_info)
+
+serial_port = '';
+
+switch ( reward_manager_type )
+  case 'arduino'
+    if ( ~isfield(reward_info, 'serial_port') )
+      error( 'Required field `serial_port` is missing.' );
+    end
+    
+    serial_port = reward_info.serial_port;
+    
+  case 'ni'
+    %
+  otherwise
+    error( 'Unhandled reward manager type "%s".', reward_manager_type );
+end
+
+end
+
+function reward_manager = make_reward_manager(manager_type, ni_scan_output, serial_port, channel_index)
+
+switch ( manager_type )
+  case 'ni'
+    reward_manager = make_ni_reward_manager( ni_scan_output, channel_index );
+    
+  case 'arduino'
+    reward_manager = make_arduino_reward_manager( serial_port );
+    
+  otherwise
+    error( 'Unhandled reward manager type "%s".', manager_type );
+end
+
+end
+
+function reward_manager = make_arduino_reward_manager(serial_port)
+
+port = serial_port;
+messages = struct();
+channels = serial.channels;
+
+reward_manager = serial_comm.SerialManager( port, messages, channels );
+start( reward_manager );
+
+end
+
 function reward_manager = make_ni_reward_manager(ni_scan_output, channel_index)
 
 reward_manager = ptb.signal.SingleScanOutputPulseManager( ni_scan_output, channel_index );
@@ -131,5 +198,16 @@ ni_device_id = pct.util.get_ni_daq_device_id();
 
 addAnalogOutputChannel( ni_session, ni_device_id, 0, 'Voltage' );
 addAnalogOutputChannel( ni_session, ni_device_id, 1, 'Voltage' );
+
+end
+
+function type = get_reward_manager_type(reward_info)
+
+type = 'ni';
+
+if ( isstruct(reward_info) && isfield(reward_info, 'manager_type') )
+  type = ...
+    validatestring( reward_info.manager_type, {'ni', 'arduino'}, mfilename, 'manager_type' );
+end
 
 end

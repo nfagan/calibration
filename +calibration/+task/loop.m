@@ -11,11 +11,19 @@ key_timer = program.Value.reward_info.key_timer;
 key_timeout = program.Value.reward_info.key_timeout;
 
 if ( elapsed(key_timer) > key_timeout && ptb.util.is_key_down(ptb.keys.r) )
-  trigger( reward_manager, reward_size );
+  if ( ~isempty(ni_scan_output) )
+    trigger( reward_manager, reward_size );
+  else
+    reward( reward_manager, 1, reward_size * 1e3 ); % ms for arduino reward manager.
+  end
+  
   reset( key_timer );
 end
 
-update( ni_scan_output );
+if ( ~isempty(ni_scan_output) )
+  update( ni_scan_output );
+end
+
 update( reward_manager );
 
 end
