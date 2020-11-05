@@ -171,7 +171,7 @@ function reward_manager = make_arduino_reward_manager(serial_port)
 
 port = serial_port;
 messages = struct();
-channels = serial.channels;
+channels = {'A'};
 
 reward_manager = serial_comm.SerialManager( port, messages, channels );
 start( reward_manager );
