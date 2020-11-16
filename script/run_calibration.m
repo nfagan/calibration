@@ -10,10 +10,6 @@ if nargin < 4
   n_cal_pts = 5;
 end
 
-full_rect = screen_info.full_rect;
-cal_rect = screen_info.calibration_rect;
-screen_index = screen_info.screen_index;
-
 target_size = 50; % px;
 %n_cal_pts = 5;
 skip_sync_tests = 1;
@@ -26,9 +22,10 @@ callback_data = make_callback_data( ni_scan_output, reward_manager, reward_size 
 update_callback = @() update_func( callback_data );
 
 Screen( 'Preference', 'skipsynctests', skip_sync_tests );
+ListenChar( 2 );
 
 try
-    calibration.EYECALWin( screen_index, full_rect, cal_rect, target_size, n_cal_pts ...
+    calibration.EYECALWin( screen_info, target_size, n_cal_pts ...
       , skip_sync_tests, update_callback );
     calibration.cleanup();
 catch err

@@ -1,5 +1,10 @@
-function EYECALWin(screen_index, full_rect, cal_rect, target_size, n_cal_pts ...
+function EYECALWin(screen_info, target_size, n_cal_pts ...
   , skip_sync_tests, update_callback)   % modified from eyecal_gka
+
+screen_index = screen_info.screen_index;
+full_rect = screen_info.full_rect;
+cal_rect = screen_info.calibration_rect;
+db_screen_info = debug_screen_info( screen_info );
 
 import calibration.sharedWorkspace;
 import calibration.escapeHandler;
@@ -43,6 +48,11 @@ end
 
 [window, wRect] = Screen( 'OpenWindow', const.monkeyScreen, const.bgColor, full_rect );%#ok<*NASGU>
 
+if ( ~isempty(db_screen_info) )
+  [db_screen_info.window, db_screen_info.rect] = ...
+    Screen( 'OpenWindow', db_screen_info.index, const.bgColor, db_screen_info.rect );
+end
+
 % blankScreen = Screen('OpenOffscreenWindow', const.monkeyScreen, const.bgColor, [], 32);
 const.screenCenter = round([mean(wRect([1 3])) mean(wRect([2 4]))]);
 startEyelinkCal(cal_rect, n_cal_pts); % Open communications with Eyelink and put it into calibration mode
@@ -80,6 +90,10 @@ keyHandlers(2).key = 'j';
 
 % Screen('CopyWindow',blankScreen,window,wRect,wRect); % Sync with the screen
 Screen('Flip',window);
+
+if ( ~isempty(db_screen_info) )
+  Screen( 'Flip', db_screen_info.window );
+end
 
 % Create a "shared workspace" to store data that needs to be accessed by multiple functions, but isn't appropriate for passing as arguments:
 sharedWorkspace EYECALWin -clear;
@@ -128,6 +142,13 @@ while sharedWorkspace('EYECALWin','keepGoing') %global workspace saves values ou
           imload=imread(imgfile{a(b)},'jpg');
           Screen('PutImage',window,imload,targRect);
           Screen('Flip', window);
+          
+          if ( ~isempty(db_screen_info) )
+            db_targ_rect = ...
+              debug_screen_target_rect( targRect, wRect, db_screen_info.rect );
+            Screen( 'PutImage', db_screen_info.window, imload, db_targ_rect );
+            Screen( 'Flip', db_screen_info.window );
+          end
           
           reset( trial_timer );
           while ( elapsed(trial_timer) < 0.5 )
@@ -213,4 +234,41 @@ sca;
 commandwindow;
 % Restore keyboard output to Matlab:
 ListenChar(0);
+
+function info = debug_screen_info(screen_info)
+
+info = [];
+
+if ( ~isfield(screen_info, 'debug_screen_index') )
+  return
+end
+
+info = struct();
+info.index = screen_info.debug_screen_index;
+info.rect = [];
+
+if ( isfield(screen_info, 'debug_screen_rect') )
+  info.rect = screen_info.debug_screen_rect;
+end
+
+function rect = debug_screen_target_rect(targ_rect, main_win_rect, db_rect)
+
+main_width = main_win_rect(3) - main_win_rect(1);
+main_height = main_win_rect(4) - main_win_rect(2);
+
+db_width = db_rect(3) - db_rect(1);
+db_height = db_rect(4) - db_rect(2);
+
+x0 = targ_rect(1) / main_width;
+x1 = targ_rect(3) / main_width;
+y0 = targ_rect(2) / main_height;
+y1 = targ_rect(4) / main_height;
+
+rect = zeros( 1, 4 );
+rect(1) = x0 * db_width;
+rect(2) = y0 * db_height;
+rect(3) = x1 * db_width;
+rect(4) = y1 * db_height;
+
+
 
